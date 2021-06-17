@@ -24,7 +24,7 @@
     <orderEntry type="library" name="Leiningen: cc.qbits/alia:4.3.3" level="project" />
     <orderEntry type="library" name="Leiningen: cc.qbits/commons:0.5.1" level="project" />
     <orderEntry type="library" name="Leiningen: cc.qbits/hayt:4.1.0" level="project" />
-    <orderEntry type="library" name="Leiningen: clj-time:0.13.0" level="project" />
+    <orderEntry type="library" name="Leiningen: clj-time:0.11.0" level="project" />
     <orderEntry type="library" name="Leiningen: clojure-complete:0.2.5" level="project" />
     <orderEntry type="library" name="Leiningen: com.datastax.cassandra/cassandra-driver-core:3.6.0:shaded" level="project" />
     <orderEntry type="library" name="Leiningen: com.datastax.cassandra/dse-driver:1.1.2" level="project" />
@@ -44,7 +44,7 @@
     <orderEntry type="library" name="Leiningen: io.aleph/dirigiste:0.1.5" level="project" />
     <orderEntry type="library" name="Leiningen: io.aviso/pretty:0.1.37" level="project" />
     <orderEntry type="library" name="Leiningen: io.dropwizard.metrics/metrics-core:3.2.2" level="project" />
-    <orderEntry type="library" name="Leiningen: joda-time:2.9.7" level="project" />
+    <orderEntry type="library" name="Leiningen: joda-time:2.8.2" level="project" />
     <orderEntry type="library" name="Leiningen: manifold:0.1.8" level="project" />
     <orderEntry type="library" name="Leiningen: nrepl:0.6.0" level="project" />
     <orderEntry type="library" name="Leiningen: org.apache.commons/commons-lang3:3.4" level="project" />

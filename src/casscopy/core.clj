@@ -1,57 +1,73 @@
 (ns casscopy.core
   (:refer-clojure :exclude [update])
   (:require [qbits.alia :as alia]
-            [clojure.tools.cli :refer [parse-opts]]
+            [qbits.hayt :refer [->raw allow-filtering columns count* select where insert values]]
+            [clojure.tools.cli :as cli]
             [taoensso.timbre :as timbre :refer [log debug info]]
-            [casscopy.db :as db]))
-
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
+            [casscopy.db :as db]
+            [casscopy.config :as config]))
 
 (def cli-options
-  [["-si" "--srcipaddress SRCIPADDRESS" "Source IP Address"]
-   ["-ti" "--tgtipaddress TGTIPADDRESS" "Target IP Address"]
-   ["-sk" "--srckeyspace SRCKEYSPACE" "Source Keyspace"]
-   ["-tk" "--tgtkeyspace TGTKEYSPACE" "Target Keyspace"]
-   ["-sp" "--srcpassword SRCPASSWORD" "Source Password"]
-   ["-tp" "--tgtpassword TGTPASSWORD" "Target Password"]
+  [["-tns" "--table-names TABLE-NAMES" "Table names to copy data from / to."]
    ["-h" "--help"]])
 
-(defn connect-to-db [ipaddress pwd]
-  (let [
-        cluster (alia/cluster {:contact-points [ipaddress] :credentials {:user dbUser :password pwd}})
-        session (alia/connect cluster)]
-    (reset! my-cluster cluster)
-    (reset! my-session session)))
+(defn get-table-name
+  "Get the name of the table 't' prefixed with the name of the keyspace 'k' followed by a '.'
+  i.e. returns 'k.t'."
+  [keyspace table-name]
+  (str keyspace "." table-name))
 
-(defn disconnect-from-db [session-atom cluster-atom]
-  (alia/shutdown @session-atom)
-  (alia/shutdown @cluster-atom))
+(defn get-data [src-db-map table-name]
+  (let [ks-table-name (keyword (get-table-name (:keyspace src-db-map) table-name))
+        rows (alia/execute (:session src-db-map) (select ks-table-name))]
+    ;; (debug "rows...")
+    ;; (fipp rows)
+    rows))
 
-(defn copy [source-credentials target-credentials])
+(defn get-seq-of-seqs [row]
+  (into [] row))
+
+(defn insert-row [tgt-db-map table-name row]
+  (let [ks-table-name (keyword (get-table-name (:keyspace tgt-db-map) table-name))
+        seq-of-seqs (get-seq-of-seqs row)
+        insert-stmt (insert ks-table-name (values seq-of-seqs))
+        raw-insert-stmt (->raw insert-stmt)]
+    ;; (debug "kstn:" ks-table-name)
+    ;; (debug "row as seq-of-seqs:" seq-of-seqs)
+    ;; (debug "insert-stmt:" insert-stmt)
+    ;; (debug "raw-insert-stmt:" raw-insert-stmt)
+    (alia/execute (:session tgt-db-map) insert-stmt)))
+
+(defn insert-data [tgt-db-map table-name rows]
+  (let [inserted-rows (vec (map #(insert-row tgt-db-map table-name %) rows))]
+    inserted-rows))
+
+(defn copy-data [src-db-map tgt-db-map table-name]
+  (let [src-rows (get-data src-db-map table-name)
+        tgt-rows (get-data tgt-db-map table-name)]
+    (info "copying data for:" table-name "...")
+    (if (= (count src-rows) (count tgt-rows))
+      (info "src & tgt have same number of rows, so no need to copy anything...")
+      (let [inserted-rows (insert-data tgt-db-map table-name src-rows)]
+        inserted-rows))))
 
 (defn -main
-  "Copy Cassndra data from one server to another."
+  "Copy Cassandra data from one server (source) to another (target)."
   [& args]
-  (let [cli-args (parse-opts args cli-options)
+  (let [cli-args (cli/parse-opts args cli-options)
         errors (:errors cli-args)
         options (:options cli-args)
-        src-ip (:srcipaddress options)
-        tgt-ip (:tgtipaddress options)
-        src-ks (:srckeyspace options)
-        tgt-ks (:tgtkeyspace options)
-        src-pwd (:srcpassword options)
-        tgt-pwd (:tgtpassword options)]
+        all-tables (:table-names options)
+        config-data (config/read-config)
+        src-db-config (:source config-data)
+        tgt-db-config (:target config-data)
+        src-db-map (db/connect-to-db src-db-config)
+        tgt-db-map (db/connect-to-db tgt-db-config)]
     (if errors
       (info errors)
       ((try
-         (reset! db/src-keyspace src-ks)
-         (reset! db/tgt-keyspace tgt-ks)
-         (connect-to-db src-ip src-pwd)
-         (connect-to-db tgt-ip tgt-pwd)
-
+         (doseq [table-name all-tables]
+           (copy-data src-db-map tgt-db-map table-name))
          (catch Exception e (info (.toString e)))
-         (finally (disconnect-from-db db/tgt-session db/tgt-cluster)
-                  (disconnect-from-db db/src-session db/src-cluster)))))))
+         (finally (db/disconnect-from-db tgt-db-map)
+                  (db/disconnect-from-db src-db-map)))))))

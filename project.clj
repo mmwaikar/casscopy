@@ -9,8 +9,7 @@
                  [com.taoensso/timbre "5.1.2"]
                  [fipp "0.6.23"]
                  [yogthos/config "1.1.7"]
-                 [org.clojure/tools.cli "1.0.206"]
-                 [clj-time "0.13.0"]]
+                 [org.clojure/tools.cli "1.0.206"]]
   :main ^:skip-aot casscopy.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all
