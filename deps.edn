@@ -1,0 +1,5 @@
+{:deps
+ {cc.qbits/alia-all {:mvn/version "4.3.3"}
+  cc.qbits/hayt {:mvn/version "4.1.0"}
+  com.taoensso/timbre {:mvn/version "5.1.2"}
+  fipp/fipp {:mvn/version "0.6.23"}}}

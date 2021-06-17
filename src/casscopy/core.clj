@@ -1,57 +1,118 @@
 (ns casscopy.core
-  (:refer-clojure :exclude [update])
   (:require [qbits.alia :as alia]
-            [clojure.tools.cli :refer [parse-opts]]
-            [taoensso.timbre :as timbre :refer [log debug info]]
-            [casscopy.db :as db]))
+            [qbits.hayt :refer [->raw allow-filtering columns count* select where insert values]]
+            [fipp.edn :refer [pprint] :rename {pprint fipp}]
+            [taoensso.timbre :refer [debug info]]))
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
+(def src-db-config {:host     "storeman34.intercax.com"
+                    :port     9042
+                    :username "cassandra"
+                    :password "Lincass@Intercax"
+                    :keyspace "syndeia_cloud_store"})
 
-(def cli-options
-  [["-si" "--srcipaddress SRCIPADDRESS" "Source IP Address"]
-   ["-ti" "--tgtipaddress TGTIPADDRESS" "Target IP Address"]
-   ["-sk" "--srckeyspace SRCKEYSPACE" "Source Keyspace"]
-   ["-tk" "--tgtkeyspace TGTKEYSPACE" "Target Keyspace"]
-   ["-sp" "--srcpassword SRCPASSWORD" "Source Password"]
-   ["-tp" "--tgtpassword TGTPASSWORD" "Target Password"]
-   ["-h" "--help"]])
+(def tgt-db-config {:host     "localhost"
+                    :port     9042
+                    :username "cassandra"
+                    :password "cassandra"
+                    :keyspace "syndeia_cloud_store"})
 
-(defn connect-to-db [ipaddress pwd]
-  (let [
-        cluster (alia/cluster {:contact-points [ipaddress] :credentials {:user dbUser :password pwd}})
-        session (alia/connect cluster)]
-    (reset! my-cluster cluster)
-    (reset! my-session session)))
+;; (def row1 {:nickname "yo" :city "city" :country "country" :first_name "fn" :last_name "ln" :zip "zip"})
+;; (def row2 {:nickname "yo1" :city "city1" :country "country1" :first_name "fn1" :last_name "ln1" :zip "zip1"})
+;; (def rows [row1 row2])
 
-(defn disconnect-from-db [session-atom cluster-atom]
-  (alia/shutdown @session-atom)
-  (alia/shutdown @cluster-atom))
+(def repo-type-tables ["repository_types"])
+(def cont-type-tables ["container_types" "container_types_by_external_id" "container_types_by_external_key" "container_types_by_repository_key"])
+(def art-type-tables ["artifact_types" "artifact_types_by_external_id" "artifact_types_by_external_key" "artifact_types_by_repository_key"])
+(def rel-type-tables ["relation_types" "relation_types_by_external_id" "relation_types_by_external_key" "relation_types_by_repository_key"])
 
-(defn copy [source-credentials target-credentials])
+(def repo-tables ["repositories" "repositories_by_uri"])
+(def cont-tables ["containers" "containers_by_external_id" "containers_by_external_key" "containers_by_repository_key"])
+(def art-tables ["artifacts" "artifacts_by_container_key" "artifacts_by_external_id" "artifacts_by_external_key" "artifacts_by_key"
+                 "artifacts_by_type_key"])
+(def rel-tables ["relations" "relations_by_container_key" "relations_by_external_id" "relations_by_external_key" "relations_by_key"
+                 "relations_by_source_key" "relations_by_target_key"])
+(def all-tables (concat repo-type-tables cont-type-tables art-type-tables rel-type-tables
+                        repo-tables cont-tables art-tables rel-tables))
 
-(defn -main
-  "Copy Cassndra data from one server to another."
-  [& args]
-  (let [cli-args (parse-opts args cli-options)
-        errors (:errors cli-args)
-        options (:options cli-args)
-        src-ip (:srcipaddress options)
-        tgt-ip (:tgtipaddress options)
-        src-ks (:srckeyspace options)
-        tgt-ks (:tgtkeyspace options)
-        src-pwd (:srcpassword options)
-        tgt-pwd (:tgtpassword options)]
-    (if errors
-      (info errors)
-      ((try
-         (reset! db/src-keyspace src-ks)
-         (reset! db/tgt-keyspace tgt-ks)
-         (connect-to-db src-ip src-pwd)
-         (connect-to-db tgt-ip tgt-pwd)
+(defn get-db-map
+  "Returns a map which contains a Cassandra cluster, session and keyspace information."
+  ([session keyspace] (get-db-map nil session keyspace))
 
-         (catch Exception e (info (.toString e)))
-         (finally (disconnect-from-db db/tgt-session db/tgt-cluster)
-                  (disconnect-from-db db/src-session db/src-cluster)))))))
+  ([cluster session keyspace]
+   {:cluster cluster :session session :keyspace keyspace}))
+
+(defn connect-to-db
+  "Connects to a Cassandra keyspace on a particular ip-address, with the given username and password."
+  ([db-config]
+   (let [{:keys [host port username password keyspace]} db-config]
+     (connect-to-db host port username password keyspace)))
+
+  ([ip-address port username password keyspace]
+   (let [cluster (alia/cluster {:contact-points [ip-address]
+                                :port           port
+                                :credentials    {:user username :password password}})
+         session (alia/connect cluster)]
+     (debug "Connecting to" keyspace "on" (str ip-address ":" port))
+     (get-db-map cluster session keyspace))))
+
+(defn disconnect-from-db
+  "Disconnects from Cassandra session and cluster information contained in the db-map."
+  [db-map]
+  (debug "Disconnecting... bye!")
+  (alia/shutdown (:session db-map))
+  (alia/shutdown (:cluster db-map)))
+
+(defn get-table-name
+  "Get the name of the table 't' prefixed with the name of the keyspace 'k' followed by a '.'
+  i.e. returns 'k.t'."
+  [keyspace table-name]
+  (str keyspace "." table-name))
+
+(defn get-data [src-db-map table-name]
+  (let [ks-table-name (keyword (get-table-name (:keyspace src-db-map) table-name))
+        rows (alia/execute (:session src-db-map) (select ks-table-name))]
+    ;; (debug "rows...")
+    ;; (fipp rows)
+    rows))
+
+(defn get-seq-of-seqs [row]
+  (into [] row))
+
+(defn insert-row [tgt-db-map table-name row]
+  (let [ks-table-name (keyword (get-table-name (:keyspace tgt-db-map) table-name))
+        seq-of-seqs (get-seq-of-seqs row)
+        insert-stmt (insert ks-table-name (values seq-of-seqs))
+        raw-insert-stmt (->raw insert-stmt)]
+    ;; (debug "kstn:" ks-table-name)
+    ;; (debug "row as seq-of-seqs:" seq-of-seqs)
+    ;; (debug "insert-stmt:" insert-stmt)
+    ;; (debug "raw-insert-stmt:" raw-insert-stmt)
+    (alia/execute (:session tgt-db-map) insert-stmt)))
+
+(defn insert-data [tgt-db-map table-name rows]
+  (let [inserted-rows (vec (map #(insert-row tgt-db-map table-name %) rows))]
+    inserted-rows))
+
+(defn copy-data [src-db-map tgt-db-map table-name]
+  (let [src-rows (get-data src-db-map table-name)
+        tgt-rows (get-data tgt-db-map table-name)]
+    (info "copying data for:" table-name "...")
+    (if (= (count src-rows) (count tgt-rows))
+      (info "src & tgt have same number of rows, so no need to copy anything...")
+      (let [inserted-rows (insert-data tgt-db-map table-name src-rows)]
+        inserted-rows))))
+
+(defn run [opts]
+  ;; (println "inserting data in players")
+  ;; (insert-data "players" rows)
+  ;; (get-data "players")
+  (let [src-db-map (connect-to-db src-db-config)
+        tgt-db-map (connect-to-db tgt-db-config)]
+    (doseq [table-name all-tables]
+      (copy-data src-db-map tgt-db-map table-name))
+    (disconnect-from-db tgt-db-map)
+    (disconnect-from-db src-db-map)))
+
+;; (comment
+;;   "to run this program from the cmd line"
+;;   clj -X casscopy/run)
