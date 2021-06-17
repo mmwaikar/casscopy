@@ -1,0 +1,29 @@
+;; =================================================================================================
+;; Settings for Cassandra DB.
+;;
+;; Replace Cassandra Host with the host name or IP address of the server where Cassandra is running.
+;; Replace Cassandra username with the username for Cassandra.
+;; Replace Cassandra password with the password for Cassandra.
+;;
+;; NOTE:
+;;
+;; (1) The value of the :port key is kept to be 9042, which is the default port for Cassandra. If your Cassandra is
+;; configured to run on a different port, please use the appropriate value in lieu of 9042.
+;;
+;; (2) Similarly, the value of the :keyspace key is kept to be syndeia_cloud_store because that's the keyspace
+;; which Syndeia Cloud uses, and the one which we have to balance.
+;;
+;; =================================================================================================
+
+{:source {:host     "localhost"
+          :port     9042
+          :username "cassandra"
+          :password "cassandra"
+          :keyspace "syndeia_cloud_store"}
+ 
+ :target {:host     "localhost"
+          :port     9042
+          :username "cassandra"
+          :password "cassandra"
+          :keyspace "syndeia_cloud_store"}}
+
