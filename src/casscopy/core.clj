@@ -4,21 +4,17 @@
             [fipp.edn :refer [pprint] :rename {pprint fipp}]
             [taoensso.timbre :refer [debug info]]))
 
-(def src-db-config {:host     "storeman34.intercax.com"
+(def src-db-config {:host     "localhost"
                     :port     9042
-                    :username "cassandra"
-                    :password "Lincass@Intercax"
-                    :keyspace "syndeia_cloud_store"})
+                    :username "username"
+                    :password "pwd"
+                    :keyspace "ks"})
 
 (def tgt-db-config {:host     "localhost"
                     :port     9042
-                    :username "cassandra"
-                    :password "cassandra"
-                    :keyspace "syndeia_cloud_store"})
-
-;; (def row1 {:nickname "yo" :city "city" :country "country" :first_name "fn" :last_name "ln" :zip "zip"})
-;; (def row2 {:nickname "yo1" :city "city1" :country "country1" :first_name "fn1" :last_name "ln1" :zip "zip1"})
-;; (def rows [row1 row2])
+                    :username "username"
+                    :password "pwd"
+                    :keyspace "ks"})
 
 (def repo-type-tables ["repository_types"])
 (def cont-type-tables ["container_types" "container_types_by_external_id" "container_types_by_external_key" "container_types_by_repository_key"])
